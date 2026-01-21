@@ -1,0 +1,8 @@
+id,name,type,price,manufacturer_id
+1,Mavic 3,Quadcopter,1500,1
+2,Phantom 4,Quadcopter,1200,1
+3,Anafi,Tiltrotor,700,2
+4,Bebop 2,Quadcopter,500,2
+5,X2,Fixed-Wing,2000,3
+6,X3 Scout,Quadcopter,1800,3
+7,Airpeak S1,Quadcopter,2500,3
