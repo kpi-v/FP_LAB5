@@ -23,3 +23,177 @@
 асоціативні списки у геш-таблиці 
 6.  Написати функцію(-ї) для "красивого" виводу записів таблиці.
 
+## Варіант 2
+База даних: Виробництво дронів
+
+Тип запису: Геш-таблиця
+
+Таблиці: 
+1. Виробники дронів;
+2. Дрони
+   
+Опис: База даних виробників дронів та, власне, дронів. 
+
+
+## Лістинг реалізації завдання
+```lisp
+;-----------------------------------------------------
+; adittional functions
+;-----------------------------------------------------
+
+(defun split-string (string delimiter)
+  (let ((result '())
+        (current '()))
+    (loop for char across string
+          do (if (char= char delimiter)
+                 (progn
+                   (push (coerce-to-string current) result)
+                   (setf current '()))
+                 (push char current)))
+    (unless (null current)
+      (push (coerce-to-string current) result))
+    (reverse result)))
+
+(defun coerce-to-string (char-list)
+  (if char-list
+      (coerce (nreverse char-list) 'string)
+      ""))
+
+;-----------------------------------------------------
+; main functions
+;-----------------------------------------------------
+
+(defun read-csv-to-hash (file-path)
+  (with-open-file (stream file-path :direction :input)
+    (let* ((header (split-string (read-line stream) #\,))
+           (records '()))
+      (loop for line = (read-line stream nil nil)
+            while line do
+              (let* ((values (split-string line #\,))
+                     (record (make-hash-table :test 'equal)))
+                (loop for key in header
+                      for value in values
+                      do (setf (gethash key record) value))
+                (push record records)))
+      (reverse records))))
+
+(defun select (file-path)
+  (let ((records (read-csv-to-hash file-path)))
+    (lambda (&key (filter nil))
+      (if filter
+          (remove-if-not (lambda (record)
+                           (every (lambda (pair)
+                                    (equal (gethash (car pair) record) (cdr pair)))
+                                  filter))
+                         records)
+          records))))
+
+(defun write-hashes-to-csv (records file-path)
+  (when records
+    (with-open-file (stream file-path :direction :output :if-exists :supersede)
+      (let* ((header (loop for k being the hash-keys of (first records) collect k)))
+        (format stream "~{~A~^,~}~%" header)
+        (dolist (record records)
+          (format stream "~{~A~^,~}~%"
+                  (loop for key in header
+                        collect (gethash key record ""))))))))
+
+(defun hash-to-alist (hash)
+  (let ((alist '()))
+    (maphash (lambda (k v)
+               (push (cons k v) alist))
+             hash)
+    alist))
+
+(defun print-records (records)
+  (dolist (record records)
+    (maphash (lambda (k v)
+               (format t "~A: ~A~%" k v))
+             record)))
+```
+
+## Тестові набори та утиліти
+```lisp
+(defun test-utils ()
+  (format t "--- Test ---~%")
+  (let ((file "drones.csv"))
+    (format t "~%Read csv to hash test: ~%")
+    (let ((records (read-csv-to-hash file)))
+      (print-records records)))
+
+  (let ((file "drones.csv"))
+    (format t "~%Select test: ~%")
+    (let ((selector (select file)))
+      (let ((all-records (funcall selector)))
+        (format t "All records: ~%")
+        (print-records all-records))
+      (let ((filtered-records (funcall selector :filter '(("Model" . "X1")))))
+        (format t "Filtred records (Model=X1): ~%")
+        (print-records filtered-records))))
+
+  (let ((output-file "output.csv"))
+    (format t "~%Write to csv test: ~%")
+    (let ((records (read-csv-to-hash "drones.csv")))
+      (write-hashes-to-csv records output-file)
+      (format t "Records saved to ~A~%" output-file)))
+
+  (format t "~%Convert hash to align test: ~%")
+  (let* ((hash (make-hash-table :test 'equal))
+         (alist nil))
+    (setf (gethash "Key1" hash) "Value1")
+    (setf (gethash "Key2" hash) "Value2")
+    (setf alist (hash-to-alist hash))
+    (format t "Converting from hash table to align list: ~A~%" alist)
+    (maphash (lambda (k v)
+               (format t "~A: ~A~%" k v))
+             hash)))
+```
+
+## Тестування
+
+``` lisp
+--- Test ---
+
+Read csv to hash test:
+manufacturer_id: 1
+price: 1500
+type: Quadcopter
+name: Mavic 3
+id: 1
+manufacturer_id: 2
+price: 1200
+type: Quadcopter
+name: Anafi
+id: 2
+manufacturer_id: 3
+price: 3000
+type: Fixed-Wing
+name: X2
+id: 3
+
+Select test:
+All records:
+manufacturer_id: 1
+price: 1500
+type: Quadcopter
+name: Mavic 3
+id: 1
+manufacturer_id: 2
+price: 1200
+type: Quadcopter
+name: Anafi
+id: 2
+manufacturer_id: 3
+price: 3000
+type: Fixed-Wing
+name: X2
+id: 3
+Filtred records (Model=X1):
+
+Write to csv test:
+Records saved to output.csv
+
+Convert hash to align test:
+Converting from hash table to align list: ((Key1 . Value1) (Key2 . Value2))
+NIL
+```
